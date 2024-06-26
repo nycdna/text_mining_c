@@ -1,0 +1,410 @@
+---
+title: "Text Mining _C_ (v1)"
+output: github_document
+---
+
+This markdown document contains the outputs I refer to in my Substack post on text mining Tom McCarthy's brilliant novel _C_, as well as the code I use to get those outputs. Text file of _C_ not included, _bien sûr_.
+
+A significant amount of the code below is adapted from Julia Silge and David Robinson’s [_Text Mining with R: A Tidy Approach_](https://www.tidytextmining.com/). Additionally, I imagine there are better or more elegant ways of doing many of the things I do below. My general approach was to just cobble together whatever I needed to make this project work.
+
+### Preprocessing:
+```{r}
+library(tidyverse)
+
+# loading text file and making it into a dataframe; some minor cleanup
+
+c_raw <- read.delim("C.txt", header = FALSE, sep = "\n")
+c_raw <- c_raw[["V1"]]
+c_df <- tibble(paragraph = 1:length(c_raw), text = c_raw) |>
+  mutate(chapter = cumsum(str_detect(text, regex("CHAPTER ", ignore_case = FALSE)))) |>
+  mutate(section = cumsum(str_detect(text, regex("SECTION ", ignore_case = FALSE)))) |>
+  mutate(text = trimws(gsub("PART [0-9]+", "", text))) # tossing out part headers but preserving titles of novel's parts (e.g., "Caul") as formatted in my .txt file
+
+c_df <- c_df[!grepl("CHAPTER [0-9]+|SECTION [0-9]+", c_df$text), ]
+
+# loading tidytext's stopwords list and customizing it
+
+library(tidytext)
+data(stop_words)
+
+stop_words <- bind_rows(stop_words, tibble(word = c("beneath", "set", "sets", "tell", "tells"), lexicon = "custom")) |>
+  filter(!word %in% c("c", "c's"))
+
+# tokenizing and stemming words
+
+library(SnowballC)
+
+c_tidy <- c_df |>
+  unnest_tokens(word, text) |>
+  mutate(word = gsub("'s\\b", "", word)) |>
+  anti_join(stop_words) |>
+  mutate(word = wordStem(word))
+```
+
+### Basic term frequency analysis:
+
+Here are the ten most frequently appearing word stems in _C_:
+
+```{r}
+c_tidy_sorted <- count(c_tidy, word, sort = TRUE)
+
+c_tidy_top <- slice_max(c_tidy_sorted, n, n =10)
+
+c_tidy_top
+```
+
+And here are the top 10 word stems in _C_ by tf-idf, calculated within a corpus of novels:
+
+```{r}
+library(gutenbergr)
+
+# gathering public domain novels to create a corpus in which to calculate tf-idf
+
+novels_df <- gutenberg_download(c(768, 766, 110, 42671, 526, 4300, 432, 67138), meta_fields = "title", mirror = "http://mirror.csclub.uwaterloo.ca/gutenberg/")
+
+novels_df <- novels_df[!(novels_df$text == ""), ]
+
+# tokenizing and stemming words in public domain novels; not worrying about extraneous text (e.g., titles, tables of contents) because it doesn't really matter in this context
+
+novels_tidy <- novels_df |>
+  unnest_tokens(word, text) |>
+  mutate(word = str_extract(word, "[a-z0-9']+")) |> # getting rid of underscores used for emphasis in UTF-8 encoding
+  mutate(word = gsub("'s\\b", "", word)) |>
+  anti_join(stop_words) |>
+  mutate(word = wordStem(word))
+
+# sort words in public domain novels by frequency in each novel
+
+novels_tidy_sorted <- count(novels_tidy, title, word, sort = TRUE)
+
+# merging dataframes
+
+big_dataframe <- rbind(novels_tidy_sorted, c_tidy_sorted |>
+                         mutate(title = "C", .before = "word"))
+
+# calculating tf-idf
+
+c_top_tf_idf <- big_dataframe |>
+  bind_tf_idf(word, title, n) |>
+  filter(title == "C") |>
+  slice_max(tf_idf, n = 10) |>
+  select(word, tf_idf)
+
+c_top_tf_idf
+```
+
+### Bigram frequency analysis:
+
+Here I tokenize _C_ into bigrams instead of unigrams:
+
+```{r}
+# bigrams will not be sensitive to sentence or paragraph boundaries and will include titles of novel's parts; any bigram that contains a stop word will be removed
+
+c_df_collapsed <- tibble(line = 1, text = paste(c_df$text, collapse = " "))
+c_bigrams_tidy <- c_df_collapsed |>
+  unnest_tokens(bigram, text, token = "ngrams", n = 2) |>
+  separate(bigram, c("word1", "word2"), sep = " ") |>
+  mutate(word1 = gsub("'s\\b", "", word1)) |>
+  filter(!word1 %in% stop_words$word) |>
+  mutate(word1 = wordStem(word1)) |>
+  mutate(word2 = gsub("'s\\b", "", word2)) |>
+  filter(!word2 %in% stop_words$word) |>
+  mutate(word2 = wordStem(word2)) |>
+  unite(bigram, word1, word2, sep = " ")
+
+# 20 most frequently appearing bigrams in C:
+
+c_bigrams_tidy_sorted <- count(c_bigrams_tidy, bigram, sort = TRUE)
+
+c_bigrams_tidy_top <- slice_max(c_bigrams_tidy_sorted, n, n =20, with_ties = FALSE)
+
+c_bigrams_tidy_top
+```
+
+Here I check to see if the top bigrams in _C_ remain basically the same if we calculate based on tf-idf instead of simple bigram frequency:
+
+```{r}
+# getting bigrams of public domain novels
+
+novels_df_collapsed <- aggregate(novels_df$text, list(novels_df$title), paste, collapse=" ")
+novels_bigrams_tidy <- novels_df_collapsed |>
+  unnest_tokens(bigram, x, token = "ngrams", n = 2) |>
+  separate(bigram, c("word1", "word2"), sep = " ") |>
+  mutate(word1 = str_extract(word1, "[a-z0-9']+")) |>
+  mutate(word1 = gsub("'s\\b", "", word1)) |>
+  filter(!word1 %in% stop_words$word) |>
+  mutate(word1 = wordStem(word1)) |>
+  mutate(word2 = str_extract(word2, "[a-z0-9']+")) |>
+  mutate(word2 = gsub("'s\\b", "", word2)) |>
+  filter(!word2 %in% stop_words$word) |>
+  mutate(word2 = wordStem(word2)) |>
+  unite(bigram, word1, word2, sep = " ")
+
+novels_bigrams_tidy_sorted <- count(novels_bigrams_tidy, Group.1, bigram, sort = TRUE)
+  
+big_bigram_dataframe <- rbind(novels_bigrams_tidy_sorted, c_bigrams_tidy_sorted |>
+                         mutate(Group.1 = "C", .before = "bigram"))
+
+c_top_bigram_tf_idf <- big_bigram_dataframe |>
+  bind_tf_idf(bigram, Group.1, n) |>
+  filter(Group.1 == "C") |>
+  slice_max(tf_idf, n = 20, with_ties = FALSE) |>
+  select(bigram, tf_idf)
+
+c_top_bigram_tf_idf
+```
+
+Here's a graph of the 20 most freuqent bigrams in _C_:
+
+```{r}
+# taking the bigram visualization approach described in Chapter 4 of Text Mining with R: A Tidy Approach and tweaking it a bit
+
+library(ggraph)
+set_graph_style(family = "mono", background = "white")
+
+c_bigrams_graph <- c_bigrams_tidy_top |>
+  separate(bigram, c("word1", "word2"), sep = " ")
+
+set.seed(4)
+
+ggraph(c_bigrams_graph, layout = "nicely") +
+  geom_edge_link(alpha=0.3) +
+  geom_node_point(colour = "#ED1C24") +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1, repel = TRUE) +
+  theme_void()
+```
+
+### Frequency analysis of specified words:
+
+Here I look at the frequency in _C_ of the following words, based on appearances per chapter or section:
+
+```{r, echo = FALSE}
+cat("
+| C      | Christ                   | copper                  |
+| call   | cipher                   | crypt/cryptography/etc. |
+| carbon | cocaine                  | cyan/cyanide            |
+| centre | communication/Comintern  | cyst                    |
+| code   | connect                  | sea                     |
+")
+```
+
+First I look at the aggregate frequency of all 20 words across chapters and sections (not particularly interesting).
+
+```{r}
+# filtering unigrams of _C_ down to only the specified words
+
+specified_words_filtered <- c_tidy |>
+  filter(chapter > 0) |>
+  filter(grepl("\\bc\\b|\\bcall\\b|^carbon|^centr|^christ|^cipher|^cocain|\\bcode\\b|^codew|^commun|^comintern|^connect|^copper|^crypt|^cyan|^cyst|\\bsea\\b", word)) |>
+  filter(!word %in% c("c'est", "communion"))
+
+# getting total number of words by chapter/section (inclusive of stopwords)
+
+total_words_by_chapter <- c_df |>
+  unnest_tokens(word, text) |>
+  filter(chapter > 0) |>
+  count(chapter) |>
+  rename(total = n)
+
+total_words_by_section <- c_df |>
+  unnest_tokens(word, text) |>
+  filter(section > 0) |>
+  count(section) |>
+  rename(total = n)
+
+# getting number of specified words by chapter/section
+
+specified_words_sorted_by_chapter <- specified_words_filtered |>
+  select(chapter, word) |>
+  count(chapter, word, sort = TRUE)
+
+specified_words_sorted_by_section <- specified_words_filtered |>
+  select(section, word) |>
+  count(section, word, sort = TRUE)
+
+# calculating and plotting aggregate frequency of all 20 words by chapter/section (not particularly interesting):
+
+aggregate_word_frequency_by_chapter <- specified_words_sorted_by_chapter |>
+  group_by(chapter) |>
+  summarise(n = sum(n)) |>
+  left_join(total_words_by_chapter, by = "chapter") |>
+  mutate (percentage = n/total)
+
+aggregate_word_frequency_by_section <- specified_words_sorted_by_section |>
+  group_by(section) |>
+  summarise(n = sum(n)) |>
+  left_join(total_words_by_section, by = "section") |>
+  mutate (percentage = n/total)
+
+library(patchwork)
+theme_set(theme_classic())
+
+plot1 <- ggplot(aggregate_word_frequency_by_chapter, aes(chapter, percentage)) +
+  geom_line(color = "#ED1C24") +
+  scale_x_continuous(limits = c(1,12), breaks = seq(0, 100), expand = c(0, 0)) +
+  theme(axis.title.y = element_text(vjust = 2, family = "mono"),
+        axis.title.x = element_text(family = "mono"))
+
+plot2 <- ggplot(aggregate_word_frequency_by_section, aes(section, percentage)) +
+  geom_line(color = "#ED1C24") +
+  scale_x_continuous(limits = c(1,39), breaks = seq(0, 100), expand = c(0, 0)) +
+  theme(axis.title.y = element_text(vjust = 2, family = "mono"),
+        axis.title.x = element_text(family = "mono"))
+
+plot1
+```
+
+Now I look at the frequency of specific words across chapters/sections:
+
+```{r}
+# calculating frequency of specified words across chapters/sections:
+
+specified_word_frequency_by_chapter <- specified_words_sorted_by_chapter |>
+  mutate(c = case_when(word == "c" ~ n, TRUE ~ 0)) |>
+  mutate(call = case_when(word == "call" ~ n, TRUE ~ 0)) |>
+  mutate(carbon = case_when(startsWith(word, "carbon") ~ n, TRUE ~ 0)) |>
+  mutate(centre = case_when(startsWith(word, "centr") ~ n, TRUE ~ 0)) |>
+  mutate(christ = case_when(startsWith(word, "christ") ~ n, TRUE ~ 0)) |>
+  mutate(cipher = case_when(startsWith(word, "cipher") ~ n, TRUE ~ 0)) |>
+  mutate(cocaine = case_when(startsWith(word, "cocain") ~ n, TRUE ~ 0)) |>
+  mutate(code = case_when(startsWith(word, "code") ~ n, TRUE ~ 0)) |>
+  mutate(communication = case_when(startsWith(word, "commun") | startsWith(word, "comintern") ~ n, TRUE ~ 0)) |>
+  mutate(connect = case_when(startsWith(word, "connect") ~ n, TRUE ~ 0)) |>
+  mutate(copper = case_when(startsWith(word, "copper") ~ n, TRUE ~ 0)) |>
+  mutate(crypt = case_when(startsWith(word, "crypt") ~ n, TRUE ~ 0)) |>
+  mutate(cyan = case_when(startsWith(word, "cyan") ~ n, TRUE ~ 0)) |>
+  mutate(cyst = case_when(startsWith(word, "cyst") ~ n, TRUE ~ 0)) |>
+  mutate(sea = case_when(startsWith(word, "sea") ~ n, TRUE ~ 0)) |>
+  group_by(chapter) |>
+  summarise(c = sum(c), call = sum(call), carbon = sum(carbon), centre = sum(centre), christ = sum(christ), cipher = sum(cipher), cocaine = sum(cocaine), code = sum(code), communication = sum(communication), connect = sum(connect), copper = sum(copper), crypt = sum(crypt), cyan = sum(cyan), cyst = sum(cyst), sea = sum(sea)) |>
+  left_join(total_words_by_chapter, by = "chapter") |>
+  mutate(across(c(2:16), ~ .x/total))
+
+specified_word_frequency_by_section <- specified_words_sorted_by_section |>
+  mutate(c = case_when(word == "c" ~ n, TRUE ~ 0)) |>
+  mutate(call = case_when(word == "call" ~ n, TRUE ~ 0)) |>
+  mutate(carbon = case_when(startsWith(word, "carbon") ~ n, TRUE ~ 0)) |>
+  mutate(centre = case_when(startsWith(word, "centr") ~ n, TRUE ~ 0)) |>
+  mutate(christ = case_when(startsWith(word, "christ") ~ n, TRUE ~ 0)) |>
+  mutate(cipher = case_when(startsWith(word, "cipher") ~ n, TRUE ~ 0)) |>
+  mutate(cocaine = case_when(startsWith(word, "cocain") ~ n, TRUE ~ 0)) |>
+  mutate(code = case_when(startsWith(word, "code") ~ n, TRUE ~ 0)) |>
+  mutate(communication = case_when(startsWith(word, "commun") | startsWith(word, "comintern") ~ n, TRUE ~ 0)) |>
+  mutate(connect = case_when(startsWith(word, "connect") ~ n, TRUE ~ 0)) |>
+  mutate(copper = case_when(startsWith(word, "copper") ~ n, TRUE ~ 0)) |>
+  mutate(crypt = case_when(startsWith(word, "crypt") ~ n, TRUE ~ 0)) |>
+  mutate(cyan = case_when(startsWith(word, "cyan") ~ n, TRUE ~ 0)) |>
+  mutate(cyst = case_when(startsWith(word, "cyst") ~ n, TRUE ~ 0)) |>
+  mutate(sea = case_when(startsWith(word, "sea") ~ n, TRUE ~ 0)) |>
+  group_by(section) |>
+  summarise(c = sum(c), call = sum(call), carbon = sum(carbon), centre = sum(centre), christ = sum(christ), cipher = sum(cipher), cocaine = sum(cocaine), code = sum(code), communication = sum(communication), connect = sum(connect), copper = sum(copper), crypt = sum(crypt), cyan = sum(cyan), cyst = sum(cyst), sea = sum(sea)) |>
+  left_join(total_words_by_section, by = "section") |>
+  mutate(across(c(2:16), ~ .x/total))
+
+# plotting individual frequencies of all 20 words across chapters/sections
+
+plot1 <- ggplot(specified_word_frequency_by_chapter, aes(chapter)) +
+  geom_line(aes(y = c, colour = "c")) +
+  geom_line(aes(y = call, colour = "call")) +
+  geom_line(aes(y = carbon, colour = "carbon")) +
+  geom_line(aes(y = centre, colour = "centre")) +
+  geom_line(aes(y = christ, colour = "christ")) +
+  geom_line(aes(y = cipher, colour = "cipher")) +
+  geom_line(aes(y = cocaine, colour = "cocaine")) +
+  geom_line(aes(y = code, colour = "code")) +
+  geom_line(aes(y = communication, colour = "communication")) +
+  geom_line(aes(y = connect, colour = "connect")) +
+  geom_line(aes(y = copper, colour = "copper")) +
+  geom_line(aes(y = crypt, colour = "crypt")) +
+  geom_line(aes(y = cyan, colour = "cyan")) +
+  geom_line(aes(y = cyst, colour = "cyst")) +
+  geom_line(aes(y = sea, colour = "sea")) +
+  scale_x_continuous(limits = c(1, 12), breaks = seq(0, 100), expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_color_manual(values = c("#ED1C24","#EF7B10","#0060A8", "#B26300", "#FFD329", "#007D32", "#F4A9BE", "#A1A5A7", "#9B0058", "#0019A8", "#00FFA1", "#9364CC", "cyan", "#6CBE45", "#BD3844")) +
+  labs(x = "chapter", y = "frequency", color="word") +
+  ggtitle("frequency of select words from C by chapter") +
+  theme(axis.title.x = element_text(family = "mono"),
+        axis.title.y = element_text(family = "mono"),
+        plot.title = element_text(family = "mono"),
+        plot.subtitle = element_text(family = "mono"),
+        legend.title = element_text(family = "mono"),
+        legend.text = element_text(family = "mono"))
+
+plot2 <- ggplot(specified_word_frequency_by_section, aes(section)) +
+  geom_line(aes(y = c, colour = "c")) +
+  geom_line(aes(y = call, colour = "call")) +
+  geom_line(aes(y = carbon, colour = "carbon")) +
+  geom_line(aes(y = centre, colour = "centre")) +
+  geom_line(aes(y = christ, colour = "christ")) +
+  geom_line(aes(y = cipher, colour = "cipher")) +
+  geom_line(aes(y = cocaine, colour = "cocaine")) +
+  geom_line(aes(y = code, colour = "code")) +
+  geom_line(aes(y = communication, colour = "communication")) +
+  geom_line(aes(y = connect, colour = "connect")) +
+  geom_line(aes(y = copper, colour = "copper")) +
+  geom_line(aes(y = crypt, colour = "crypt")) +
+  geom_line(aes(y = cyan, colour = "cyan")) +
+  geom_line(aes(y = cyst, colour = "cyst")) +
+  geom_line(aes(y = sea, colour = "sea")) +
+  scale_x_continuous(limits = c(1, 39), breaks = seq(0, 100), expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_color_manual(values = c("#ED1C24","#EF7B10","#0060A8", "#B26300", "#FFD329", "#007D32", "#F4A9BE", "#A1A5A7", "#9B0058", "#0019A8", "#00FFA1", "#9364CC", "cyan", "#6CBE45", "#BD3844")) +
+  labs(x = "section", y = "frequency", color="word") +
+  ggtitle("frequency of select words from C by section") +
+  theme(axis.title.x = element_text(family = "mono"),
+        axis.title.y = element_text(family = "mono"),
+        plot.title = element_text(family = "mono"),
+        plot.subtitle = element_text(family = "mono"),
+        legend.title = element_text(family = "mono"),
+        legend.text = element_text(family = "mono"))
+
+plot1
+```
+
+### Correlation analysis of specified words:
+
+Finally, I look at which of the 15 words beginning with _C_ specified above are most likely to occur in the same chapter/section of _C_:
+
+```{r}
+library(widyr)
+
+word_pairs_by_chapter <- specified_words_filtered |>
+  select(chapter, word) |>
+  group_by(word) |>
+  pairwise_cor(word, chapter, sort = TRUE)
+
+word_pairs_by_section <- specified_words_filtered |>
+  select(section, word) |>
+  group_by(word) |>
+  pairwise_cor(word, section, sort = TRUE)
+
+top_word_pairs_by_section <- word_pairs_by_section |>
+  filter(correlation > .6)
+
+top_word_pairs_by_section
+```
+
+And here's a visualization of every pair of those specified words that has a greater than 0.2 correlation within sections of _C_:
+
+```{r}
+set.seed(44)
+
+plot1 <- word_pairs_by_chapter |>
+  filter(correlation > .2) |>
+  ggraph(layout = "nicely") +
+  geom_edge_link(aes(edge_alpha = correlation), show.legend = FALSE) +
+  geom_node_point(color = "#ED1C24", size = 3) +
+  geom_node_text(aes(label = name), repel = TRUE) +
+  theme_void()
+
+plot2 <- word_pairs_by_section |>
+  filter(correlation > .2) |>
+  ggraph(layout = "nicely") +
+  geom_edge_link(aes(edge_alpha = correlation), show.legend = FALSE) +
+  geom_node_point(color = "#ED1C24", size = 3) +
+  geom_node_text(aes(label = name), repel = TRUE) +
+  theme_void()
+
+plot2
+```
