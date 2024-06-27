@@ -34,11 +34,16 @@ stop_words <- bind_rows(stop_words, tibble(word = c("beneath", "set", "sets", "t
 
 library(SnowballC)
 
-c_tidy <- c_df |>
-  unnest_tokens(word, text) |>
+c_tidy_blocked <- c_df |>
+  unnest_tokens(word, text)
+
+c_tidy_blocked$block <- rep(seq(1, 1 + (nrow(c_tidy_blocked)) %/% 100), each = 100, length.out = nrow(c_tidy_blocked)) # adding a marker every 100 words (before removing stop words) such that text can be partitioned into blocks of "uniform" length
+  
+c_tidy <- c_tidy_blocked |>
   mutate(word = gsub("'s\\b", "", word)) |>
   anti_join(stop_words) |>
   mutate(word = wordStem(word))
+
 ```
 
 ### Basic term frequency analysis:
@@ -212,6 +217,10 @@ total_words_by_section <- c_df |>
   count(section) |>
   rename(total = n)
 
+total_words_by_block <- c_tidy_blocked |>
+  count(block) |>
+  rename(total = n)
+
 # getting number of specified words by chapter/section
 
 specified_words_sorted_by_chapter <- specified_words_filtered |>
@@ -221,6 +230,10 @@ specified_words_sorted_by_chapter <- specified_words_filtered |>
 specified_words_sorted_by_section <- specified_words_filtered |>
   select(section, word) |>
   count(section, word, sort = TRUE)
+
+specified_words_sorted_by_block <- specified_words_filtered |>
+  select(block, word) |>
+  count(block, word, sort = TRUE)
 
 # calculating and plotting aggregate frequency of all 20 words by chapter/section (not particularly interesting):
 
@@ -236,6 +249,12 @@ aggregate_word_frequency_by_section <- specified_words_sorted_by_section |>
   left_join(total_words_by_section, by = "section") |>
   mutate (percentage = n/total)
 
+aggregate_word_frequency_by_block <- specified_words_sorted_by_block |>
+  group_by(block) |>
+  summarise(n = sum(n)) |>
+  left_join(total_words_by_block, by = "block") |>
+  mutate (percentage = n/total)
+
 library(patchwork)
 theme_set(theme_classic())
 
@@ -247,17 +266,23 @@ plot1 <- ggplot(aggregate_word_frequency_by_chapter, aes(chapter, percentage)) +
 
 plot2 <- ggplot(aggregate_word_frequency_by_section, aes(section, percentage)) +
   geom_line(color = "#ED1C24") +
-  scale_x_continuous(limits = c(1,39), breaks = seq(0, 100), expand = c(0, 0)) +
+  scale_x_continuous(limits = c(1,39), breaks = seq(0, 100, by = 5), expand = c(0, 0)) +
   theme(axis.title.y = element_text(vjust = 2, family = "mono"),
         axis.title.x = element_text(family = "mono"))
 
-plot1
+plot3 <- ggplot(aggregate_word_frequency_by_block, aes(block, percentage)) +
+  geom_line(color = "#ED1C24") +
+  scale_x_continuous(limits = c(1,1194), breaks = seq(0, 1194, by = 100), expand = c(0, 0)) +
+  theme(axis.title.y = element_text(vjust = 2, family = "mono"),
+        axis.title.x = element_text(family = "mono"))
+
+plot2
 ```
 
-Now I look at the frequency of specific words across chapters/sections:
+Now I look at the frequency of specific words across chapters/sections/blocks:
 
 ```{r}
-# calculating frequency of specified words across chapters/sections:
+# calculating frequency of specified words across chapters/sections/blocks:
 
 specified_word_frequency_by_chapter <- specified_words_sorted_by_chapter |>
   mutate(c = case_when(word == "c" ~ n, TRUE ~ 0)) |>
@@ -299,6 +324,27 @@ specified_word_frequency_by_section <- specified_words_sorted_by_section |>
   group_by(section) |>
   summarise(c = sum(c), call = sum(call), carbon = sum(carbon), centre = sum(centre), christ = sum(christ), cipher = sum(cipher), cocaine = sum(cocaine), code = sum(code), communication = sum(communication), connect = sum(connect), copper = sum(copper), crypt = sum(crypt), cyan = sum(cyan), cyst = sum(cyst), sea = sum(sea)) |>
   left_join(total_words_by_section, by = "section") |>
+  mutate(across(c(2:16), ~ .x/total))
+
+specified_word_frequency_by_block <- specified_words_sorted_by_block |>
+  mutate(c = case_when(word == "c" ~ n, TRUE ~ 0)) |>
+  mutate(call = case_when(word == "call" ~ n, TRUE ~ 0)) |>
+  mutate(carbon = case_when(startsWith(word, "carbon") ~ n, TRUE ~ 0)) |>
+  mutate(centre = case_when(startsWith(word, "centr") ~ n, TRUE ~ 0)) |>
+  mutate(christ = case_when(startsWith(word, "christ") ~ n, TRUE ~ 0)) |>
+  mutate(cipher = case_when(startsWith(word, "cipher") ~ n, TRUE ~ 0)) |>
+  mutate(cocaine = case_when(startsWith(word, "cocain") ~ n, TRUE ~ 0)) |>
+  mutate(code = case_when(startsWith(word, "code") ~ n, TRUE ~ 0)) |>
+  mutate(communication = case_when(startsWith(word, "commun") | startsWith(word, "comintern") ~ n, TRUE ~ 0)) |>
+  mutate(connect = case_when(startsWith(word, "connect") ~ n, TRUE ~ 0)) |>
+  mutate(copper = case_when(startsWith(word, "copper") ~ n, TRUE ~ 0)) |>
+  mutate(crypt = case_when(startsWith(word, "crypt") ~ n, TRUE ~ 0)) |>
+  mutate(cyan = case_when(startsWith(word, "cyan") ~ n, TRUE ~ 0)) |>
+  mutate(cyst = case_when(startsWith(word, "cyst") ~ n, TRUE ~ 0)) |>
+  mutate(sea = case_when(startsWith(word, "sea") ~ n, TRUE ~ 0)) |>
+  group_by(block) |>
+  summarise(c = sum(c), call = sum(call), carbon = sum(carbon), centre = sum(centre), christ = sum(christ), cipher = sum(cipher), cocaine = sum(cocaine), code = sum(code), communication = sum(communication), connect = sum(connect), copper = sum(copper), crypt = sum(crypt), cyan = sum(cyan), cyst = sum(cyst), sea = sum(sea)) |>
+  left_join(total_words_by_block, by = "block") |>
   mutate(across(c(2:16), ~ .x/total))
 
 # plotting individual frequencies of all 20 words across chapters/sections
@@ -347,7 +393,7 @@ plot2 <- ggplot(specified_word_frequency_by_section, aes(section)) +
   geom_line(aes(y = cyan, colour = "cyan")) +
   geom_line(aes(y = cyst, colour = "cyst")) +
   geom_line(aes(y = sea, colour = "sea")) +
-  scale_x_continuous(limits = c(1, 39), breaks = seq(0, 100), expand = c(0, 0)) +
+  scale_x_continuous(limits = c(1, 39), breaks = seq(0, 100, by = 5), expand = c(0, 0)) +
   scale_y_continuous(expand = c(0, 0)) +
   scale_color_manual(values = c("#ED1C24","#EF7B10","#0060A8", "#B26300", "#FFD329", "#007D32", "#F4A9BE", "#A1A5A7", "#9B0058", "#0019A8", "#00FFA1", "#9364CC", "cyan", "#6CBE45", "#BD3844")) +
   labs(x = "section", y = "frequency", color="word") +
@@ -359,7 +405,35 @@ plot2 <- ggplot(specified_word_frequency_by_section, aes(section)) +
         legend.title = element_text(family = "mono"),
         legend.text = element_text(family = "mono"))
 
-plot1
+plot3 <- ggplot(specified_word_frequency_by_block, aes(block)) +
+  geom_line(aes(y = c, colour = "c")) +
+  geom_line(aes(y = call, colour = "call")) +
+  geom_line(aes(y = carbon, colour = "carbon")) +
+  geom_line(aes(y = centre, colour = "centre")) +
+  geom_line(aes(y = christ, colour = "christ")) +
+  geom_line(aes(y = cipher, colour = "cipher")) +
+  geom_line(aes(y = cocaine, colour = "cocaine")) +
+  geom_line(aes(y = code, colour = "code")) +
+  geom_line(aes(y = communication, colour = "communication")) +
+  geom_line(aes(y = connect, colour = "connect")) +
+  geom_line(aes(y = copper, colour = "copper")) +
+  geom_line(aes(y = crypt, colour = "crypt")) +
+  geom_line(aes(y = cyan, colour = "cyan")) +
+  geom_line(aes(y = cyst, colour = "cyst")) +
+  geom_line(aes(y = sea, colour = "sea")) +
+  scale_x_continuous(limits = c(1, 1194), breaks = seq(0, 1194, by = 100), expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_color_manual(values = c("#ED1C24","#EF7B10","#0060A8", "#B26300", "#FFD329", "#007D32", "#F4A9BE", "#A1A5A7", "#9B0058", "#0019A8", "#00FFA1", "#9364CC", "cyan", "#6CBE45", "#BD3844")) +
+  labs(x = "block", y = "frequency", color="word") +
+  ggtitle("frequency of select words from C by block of 100 words") +
+  theme(axis.title.x = element_text(family = "mono"),
+        axis.title.y = element_text(family = "mono"),
+        plot.title = element_text(family = "mono"),
+        plot.subtitle = element_text(family = "mono"),
+        legend.title = element_text(family = "mono"),
+        legend.text = element_text(family = "mono"))
+
+plot3
 ```
 
 ### Correlation analysis of specified words:
