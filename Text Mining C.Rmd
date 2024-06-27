@@ -203,6 +203,21 @@ specified_words_filtered <- c_tidy |>
   filter(grepl("\\bc\\b|\\bcall\\b|^carbon|^centr|^christ|^cipher|^cocain|\\bcode\\b|^codew|^commun|^comintern|^connect|^copper|^crypt|^cyan|^cyst|\\bsea\\b", word)) |>
   filter(!word %in% c("c'est", "communion"))
 
+specified_words_filtered_merged <- specified_words_filtered |>
+  mutate(word = gsub(regex("^carbon[a-zà-ú]+\\b"), "carbon", word)) |>
+  mutate(word = gsub(regex("^centr|centr[a-z]+\\b"), "centre", word)) |>
+  mutate(word = gsub(regex("^christ[a-z]+\\b"), "christ", word)) |>
+  mutate(word = gsub(regex("^cipher[a-z]+\\b"), "cipher", word)) |>
+  mutate(word = gsub(regex("cocain"), "cocaine", word)) |>
+  mutate(word = gsub(regex("^code[a-z]+\\b"), "code", word)) |>
+  mutate(word = gsub(regex("^commun|commun[a-z]+\\b|comintern"), "communication", word)) |>
+  mutate(word = gsub(regex("^connect[a-z]+\\b"), "connect", word)) |>
+  mutate(word = gsub(regex("^copper[a-z]+\\b"), "copper", word)) |>
+  mutate(word = gsub(regex("^crypt[a-z]+\\b"), "crypt", word)) |>
+  mutate(word = gsub(regex("^cyan[a-z]+\\b"), "cyan", word)) |>
+  mutate(word = gsub(regex("^cyst[a-z]+\\b"), "cyst", word)) |>
+  mutate(word = gsub(regex("^sea[a-z]+\\b"), "sea", word))
+
 # getting total number of words by chapter/section (inclusive of stopwords)
 
 total_words_by_chapter <- c_df |>
@@ -443,18 +458,23 @@ Finally, I look at which of the 15 words beginning with _C_ specified above are 
 ```{r}
 library(widyr)
 
-word_pairs_by_chapter <- specified_words_filtered |>
+word_pairs_by_chapter <- specified_words_filtered_merged |>
   select(chapter, word) |>
   group_by(word) |>
   pairwise_cor(word, chapter, sort = TRUE)
 
-word_pairs_by_section <- specified_words_filtered |>
+word_pairs_by_section <- specified_words_filtered_merged |>
   select(section, word) |>
   group_by(word) |>
   pairwise_cor(word, section, sort = TRUE)
 
+word_pairs_by_block <- specified_words_filtered_merged |>
+  select(block, word) |>
+  group_by(word) |>
+  pairwise_cor(word, block, sort = TRUE)
+
 top_word_pairs_by_section <- word_pairs_by_section |>
-  filter(correlation > .6)
+  filter(correlation > .3)
 
 top_word_pairs_by_section
 ```
@@ -466,17 +486,25 @@ set.seed(44)
 
 plot1 <- word_pairs_by_chapter |>
   filter(correlation > .2) |>
-  ggraph(layout = "nicely") +
+  ggraph(layout = "fr") +
   geom_edge_link(aes(edge_alpha = correlation), show.legend = FALSE) +
-  geom_node_point(color = "#ED1C24", size = 3) +
+  geom_node_point(color = "#ED1C24", size = 2.5, alpha = 0.85) +
   geom_node_text(aes(label = name), repel = TRUE) +
   theme_void()
 
 plot2 <- word_pairs_by_section |>
-  filter(correlation > .2) |>
-  ggraph(layout = "nicely") +
+  filter(correlation > 0) |>
+  ggraph(layout = "fr") +
   geom_edge_link(aes(edge_alpha = correlation), show.legend = FALSE) +
-  geom_node_point(color = "#ED1C24", size = 3) +
+  geom_node_point(color = "#ED1C24", size = 2.5, alpha = 0.85) +
+  geom_node_text(aes(label = name), repel = TRUE) +
+  theme_void()
+
+plot3 <- word_pairs_by_block |>
+  filter(correlation > 0) |>
+  ggraph(layout = "fr") +
+  geom_edge_link(aes(edge_alpha = correlation), show.legend = FALSE) +
+  geom_node_point(color = "#ED1C24", size = 2.5, alpha = 0.85) +
   geom_node_text(aes(label = name), repel = TRUE) +
   theme_void()
 
