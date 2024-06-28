@@ -1,6 +1,6 @@
 ---
 title: "Text Mining _C_ (v1)"
-output: github_document
+output: html_document
 ---
 
 This markdown document contains the outputs I refer to in my Substack post on text mining Tom McCarthy's brilliant novel _C_, as well as the code I use to get those outputs. Text file of _C_ not included, _bien sûr_.
@@ -8,17 +8,23 @@ This markdown document contains the outputs I refer to in my Substack post on te
 A significant amount of the code below is adapted from Julia Silge and David Robinson’s [_Text Mining with R: A Tidy Approach_](https://www.tidytextmining.com/). Additionally, I imagine there are better or more elegant ways of doing many of the things I do below. My general approach was to just cobble together whatever I needed to make this project work.
 
 ### Preprocessing:
-```{r}
+```{r message=FALSE, warning=FALSE}
 library(tidyverse)
 
 # loading text file and making it into a dataframe; some minor cleanup
 
+# note that I toss out part headers but preserve titles of novel's parts (e.g., "Caul") as formatted in my .txt file
+
 c_raw <- read.delim("C.txt", header = FALSE, sep = "\n")
 c_raw <- c_raw[["V1"]]
 c_df <- tibble(paragraph = 1:length(c_raw), text = c_raw) |>
-  mutate(chapter = cumsum(str_detect(text, regex("CHAPTER ", ignore_case = FALSE)))) |>
-  mutate(section = cumsum(str_detect(text, regex("SECTION ", ignore_case = FALSE)))) |>
-  mutate(text = trimws(gsub("PART [0-9]+", "", text))) # tossing out part headers but preserving titles of novel's parts (e.g., "Caul") as formatted in my .txt file
+  mutate(chapter = cumsum(str_detect(text, regex("CHAPTER",
+                                                 ignore_case = FALSE))),
+         .before = paragraph) |>
+  mutate(section = cumsum(str_detect(text, regex("SECTION",
+                                                 ignore_case = FALSE))),
+         .after = chapter) |>
+  mutate(text = trimws(gsub(regex("PART [0-9]+"), "", text)))
 
 c_df <- c_df[!grepl("CHAPTER [0-9]+|SECTION [0-9]+", c_df$text), ]
 
@@ -27,7 +33,11 @@ c_df <- c_df[!grepl("CHAPTER [0-9]+|SECTION [0-9]+", c_df$text), ]
 library(tidytext)
 data(stop_words)
 
-stop_words <- bind_rows(stop_words, tibble(word = c("beneath", "set", "sets", "tell", "tells"), lexicon = "custom")) |>
+stop_words <- bind_rows(stop_words, tibble(word = c("beneath", "set",
+                                                    "sets", "setting",
+                                                    "tell", "tells",
+                                                    "telling", "told"),
+                                           lexicon = "custom")) |>
   filter(!word %in% c("c", "c's"))
 
 # tokenizing and stemming words
@@ -37,13 +47,18 @@ library(SnowballC)
 c_tidy_blocked <- c_df |>
   unnest_tokens(word, text)
 
-c_tidy_blocked$block <- rep(seq(1, 1 + (nrow(c_tidy_blocked)) %/% 100), each = 100, length.out = nrow(c_tidy_blocked)) # adding a marker every 100 words (before removing stop words) such that text can be partitioned into blocks of "uniform" length
+# adding a marker every 100 words (before removing stop words) such that text can be partitioned into blocks of "uniform" length
+
+block_length <- 100
+
+c_tidy_blocked$block <- rep(seq(1, 1 + (nrow(c_tidy_blocked)) %/% block_length),
+                            each = block_length,
+                            length.out = nrow(c_tidy_blocked))
   
 c_tidy <- c_tidy_blocked |>
-  mutate(word = gsub("'s\\b", "", word)) |>
-  anti_join(stop_words) |>
-  mutate(word = wordStem(word))
-
+  relocate(block, .after = section) |>
+  anti_join(stop_words, by = "word") |>
+  mutate(word = wordStem(word, language = "english"))
 ```
 
 ### Basic term frequency analysis:
@@ -53,30 +68,33 @@ Here are the ten most frequently appearing word stems in _C_:
 ```{r}
 c_tidy_sorted <- count(c_tidy, word, sort = TRUE)
 
-c_tidy_top <- slice_max(c_tidy_sorted, n, n =10)
+c_tidy_top <- slice_max(c_tidy_sorted, n, n = 10, with_ties = FALSE)
 
 c_tidy_top
 ```
 
-And here are the top 10 word stems in _C_ by tf-idf, calculated within a corpus of novels:
+And here are the top 10 word stems in _C_ by tf–idf, calculated within a corpus of novels:
 
 ```{r}
 library(gutenbergr)
 
-# gathering public domain novels to create a corpus in which to calculate tf-idf
+# gathering public domain novels to create a corpus in which to calculate tf–idf
 
-novels_df <- gutenberg_download(c(768, 766, 110, 42671, 526, 4300, 432, 67138), meta_fields = "title", mirror = "http://mirror.csclub.uwaterloo.ca/gutenberg/")
+novels_df <- gutenberg_download(c(768, 766, 110, 42671,
+                                  526, 4300, 432, 67138),
+                                meta_fields = "title",
+                                mirror = "http://mirror.csclub.uwaterloo.ca/gutenberg/")
 
 novels_df <- novels_df[!(novels_df$text == ""), ]
 
-# tokenizing and stemming words in public domain novels; not worrying about extraneous text (e.g., titles, tables of contents) because it doesn't really matter in this context
+# tokenizing and stemming words in public domain novels; not worrying about extraneous text (e.g., titles, tables of contents) because retaining them doesn't strike me as ultra-consequential in this context
 
 novels_tidy <- novels_df |>
   unnest_tokens(word, text) |>
-  mutate(word = str_extract(word, "[a-z0-9']+")) |> # getting rid of underscores used for emphasis in UTF-8 encoding
-  mutate(word = gsub("'s\\b", "", word)) |>
-  anti_join(stop_words) |>
-  mutate(word = wordStem(word))
+  mutate(word = str_extract(word, "[a-zà-ÿ0-9'’]+")) |> # getting rid of underscores used for emphasis in UTF-8 encoding
+  mutate(word = gsub("’", "'", word)) |>
+  anti_join(stop_words, by = "word") |>
+  mutate(word = wordStem(word, language = "english")) # stemming all words for consistency with the approach I took with C
 
 # sort words in public domain novels by frequency in each novel
 
@@ -92,7 +110,7 @@ big_dataframe <- rbind(novels_tidy_sorted, c_tidy_sorted |>
 c_top_tf_idf <- big_dataframe |>
   bind_tf_idf(word, title, n) |>
   filter(title == "C") |>
-  slice_max(tf_idf, n = 10) |>
+  slice_max(tf_idf, n = 10, with_ties = FALSE) |>
   select(word, tf_idf)
 
 c_top_tf_idf
@@ -105,16 +123,16 @@ Here I tokenize _C_ into bigrams instead of unigrams:
 ```{r}
 # bigrams will not be sensitive to sentence or paragraph boundaries and will include titles of novel's parts; any bigram that contains a stop word will be removed
 
-c_df_collapsed <- tibble(line = 1, text = paste(c_df$text, collapse = " "))
+c_df_collapsed <- tibble(line = 1, text = paste(c_df$text, collapse = " ")) |>
+  mutate(text = gsub("  ", " ", text))
+
 c_bigrams_tidy <- c_df_collapsed |>
   unnest_tokens(bigram, text, token = "ngrams", n = 2) |>
   separate(bigram, c("word1", "word2"), sep = " ") |>
-  mutate(word1 = gsub("'s\\b", "", word1)) |>
   filter(!word1 %in% stop_words$word) |>
-  mutate(word1 = wordStem(word1)) |>
-  mutate(word2 = gsub("'s\\b", "", word2)) |>
+  mutate(word1 = wordStem(word1, language = "english")) |>
   filter(!word2 %in% stop_words$word) |>
-  mutate(word2 = wordStem(word2)) |>
+  mutate(word2 = wordStem(word2, language = "english")) |>
   unite(bigram, word1, word2, sep = " ")
 
 # 20 most frequently appearing bigrams in C:
@@ -131,28 +149,36 @@ Here I check to see if the top bigrams in _C_ remain basically the same if we ca
 ```{r}
 # getting bigrams of public domain novels
 
-novels_df_collapsed <- aggregate(novels_df$text, list(novels_df$title), paste, collapse=" ")
+novels_df_collapsed <- setNames(aggregate
+                                (novels_df$text,
+                                  list(novels_df$title),
+                                  paste, collapse=" "),
+                                c("title", "text")) |>
+  mutate(text = gsub("  ", " ", text))
+
 novels_bigrams_tidy <- novels_df_collapsed |>
-  unnest_tokens(bigram, x, token = "ngrams", n = 2) |>
+  unnest_tokens(bigram, text, token = "ngrams", n = 2) |>
   separate(bigram, c("word1", "word2"), sep = " ") |>
-  mutate(word1 = str_extract(word1, "[a-z0-9']+")) |>
-  mutate(word1 = gsub("'s\\b", "", word1)) |>
+  mutate(word1 = str_extract(word1, "[a-zà-ÿ0-9'’]+")) |>
+  mutate(word1 = gsub("’", "'", word1)) |>
   filter(!word1 %in% stop_words$word) |>
-  mutate(word1 = wordStem(word1)) |>
-  mutate(word2 = str_extract(word2, "[a-z0-9']+")) |>
-  mutate(word2 = gsub("'s\\b", "", word2)) |>
+  mutate(word1 = wordStem(word1, language = "english")) |>
+  mutate(word2 = str_extract(word2, "[a-zà-ÿ0-9'’]+")) |>
+  mutate(word1 = gsub("’", "'", word1)) |>
   filter(!word2 %in% stop_words$word) |>
-  mutate(word2 = wordStem(word2)) |>
+  mutate(word2 = wordStem(word2, language = "english")) |>
   unite(bigram, word1, word2, sep = " ")
 
-novels_bigrams_tidy_sorted <- count(novels_bigrams_tidy, Group.1, bigram, sort = TRUE)
+novels_bigrams_tidy_sorted <- count(novels_bigrams_tidy,
+                                    title, bigram, sort = TRUE)
   
-big_bigram_dataframe <- rbind(novels_bigrams_tidy_sorted, c_bigrams_tidy_sorted |>
-                         mutate(Group.1 = "C", .before = "bigram"))
+big_bigram_dataframe <- rbind(novels_bigrams_tidy_sorted,
+                              c_bigrams_tidy_sorted |>
+                         mutate(title = "C", .before = "bigram"))
 
 c_top_bigram_tf_idf <- big_bigram_dataframe |>
-  bind_tf_idf(bigram, Group.1, n) |>
-  filter(Group.1 == "C") |>
+  bind_tf_idf(bigram, title, n) |>
+  filter(title == "C") |>
   slice_max(tf_idf, n = 20, with_ties = FALSE) |>
   select(bigram, tf_idf)
 
@@ -172,9 +198,9 @@ c_bigrams_graph <- c_bigrams_tidy_top |>
 
 set.seed(4)
 
-ggraph(c_bigrams_graph, layout = "nicely") +
+ggraph(c_bigrams_graph, layout = "fr") +
   geom_edge_link(alpha=0.3) +
-  geom_node_point(colour = "#ED1C24") +
+  geom_node_point(colour = "#ED1C24", alpha = 8.5) +
   geom_node_text(aes(label = name), vjust = 1, hjust = 1, repel = TRUE) +
   theme_void()
 ```
