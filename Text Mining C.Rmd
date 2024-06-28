@@ -187,7 +187,7 @@ c_top_bigram_tf_idf
 
 Here's a graph of the 20 most freuqent bigrams in _C_:
 
-```{r}
+```{r out.width = "85%", fig.align = "center", dpi = 300}
 # taking the bigram visualization approach described in Chapter 4 of Text Mining with R: A Tidy Approach and tweaking it a bit
 
 library(ggraph)
@@ -209,42 +209,40 @@ ggraph(c_bigrams_graph, layout = "fr") +
 
 Here I look at the frequency in _C_ of the following words, based on appearances per chapter or section:
 
-```{r, echo = FALSE}
-cat("
-| C      | Christ                   | copper                  |
-| call   | cipher                   | crypt/cryptography/etc. |
-| carbon | cocaine                  | cyan/cyanide            |
-| centre | communication/Comintern  | cyst                    |
-| code   | connect                  | sea                     |
-")
+```{r, echo = FALSE, comment = NA}
+table <- matrix(c("C", "call", "carbon", "centre", "Christ",
+                  "cipher", "cocaine", "code", "communication/Comintern", "connect",
+                  "copper", "crypt/cryptography/etc.", "cyan/cyanide", "cyst", "sea"),
+                5, 3)
+
+prmatrix(table, rowlab = rep("", 5), collab = rep("", 3))
 ```
 
-First I look at the aggregate frequency of all 20 words across chapters and sections (not particularly interesting).
+First I look at the aggregate frequency of all 20 words across chapters, sections, and blocks of 100 words.
 
-```{r}
-# filtering unigrams of _C_ down to only the specified words
+```{r out.width = "100%", fig.align = "center", dpi = 300}
+# filtering unigrams of _C_ down to only the specified words and merging tokens I count as being instances of the same word for the limited purposes of this analysis (e.g., "carbon" and "cc")
+
+# not loving the inelegance of this whole chunk of code, and I know I can do this in a better way if I mess around with it more, but this works for now
 
 specified_words_filtered <- c_tidy |>
   filter(chapter > 0) |>
-  filter(grepl("\\bc\\b|\\bcall\\b|^carbon|^centr|^christ|^cipher|^cocain|\\bcode\\b|^codew|^commun|^comintern|^connect|^copper|^crypt|^cyan|^cyst|\\bsea\\b", word)) |>
-  filter(!word %in% c("c'est", "communion"))
+  filter(grepl("\\bc\\b|\\bcc\\b|\\bcall\\b|^carbon|^centr|^christ|^cipher|^cocain|\\bcode\\b|^communic|^comintern|^connect|^copper|^crypt|^cyan|^cyst|\\bsea\\b", word)) |>
+  filter(!word %in% c("c'est"))
 
 specified_words_filtered_merged <- specified_words_filtered |>
-  mutate(word = gsub(regex("^carbon[a-zà-ú]+\\b"), "carbon", word)) |>
-  mutate(word = gsub(regex("^centr|centr[a-z]+\\b"), "centre", word)) |>
-  mutate(word = gsub(regex("^christ[a-z]+\\b"), "christ", word)) |>
-  mutate(word = gsub(regex("^cipher[a-z]+\\b"), "cipher", word)) |>
-  mutate(word = gsub(regex("cocain"), "cocaine", word)) |>
-  mutate(word = gsub(regex("^code[a-z]+\\b"), "code", word)) |>
-  mutate(word = gsub(regex("^commun|commun[a-z]+\\b|comintern"), "communication", word)) |>
-  mutate(word = gsub(regex("^connect[a-z]+\\b"), "connect", word)) |>
-  mutate(word = gsub(regex("^copper[a-z]+\\b"), "copper", word)) |>
-  mutate(word = gsub(regex("^crypt[a-z]+\\b"), "crypt", word)) |>
-  mutate(word = gsub(regex("^cyan[a-z]+\\b"), "cyan", word)) |>
-  mutate(word = gsub(regex("^cyst[a-z]+\\b"), "cyst", word)) |>
-  mutate(word = gsub(regex("^sea[a-z]+\\b"), "sea", word))
+  mutate(word = gsub(regex("\\bcc\\b|\\bcc'd\\b|^carbon[a-zà-ÿ]+\\b"), "carbon", word)) |>
+  mutate(word = gsub(regex("^centr|centr[a-zà-ÿ]+\\b"), "centre", word)) |>
+  mutate(word = gsub(regex("^christ[a-zà-ÿ]+\\b"), "christ", word)) |>
+  mutate(word = gsub(regex("^cipher[a-zà-ÿ]+\\b"), "cipher", word)) |>
+  mutate(word = gsub(regex("^cocain"), "cocaine", word)) |>
+  mutate(word = gsub(regex("^communic\\b|comintern"), "communication", word)) |>
+  mutate(word = gsub(regex("^connect[a-zà-ÿ]+\\b"), "connect", word)) |>
+  mutate(word = gsub(regex("^crypt[a-zà-ÿ]+\\b"), "crypt", word)) |>
+  mutate(word = gsub(regex("^cyan[a-zà-ÿ]+\\b"), "cyan", word)) |>
+  mutate(word = gsub(regex("^cyst[a-zà-ÿ]+\\b"), "cyst", word))
 
-# getting total number of words by chapter/section (inclusive of stopwords)
+# getting total number of words by chapter/section/block (inclusive of stopwords)
 
 total_words_by_chapter <- c_df |>
   unnest_tokens(word, text) |>
@@ -262,19 +260,13 @@ total_words_by_block <- c_tidy_blocked |>
   count(block) |>
   rename(total = n)
 
-# getting number of specified words by chapter/section
+# getting number of specified words by chapter/section/block
 
-specified_words_sorted_by_chapter <- specified_words_filtered_merged |>
-  select(chapter, word) |>
-  count(chapter, word, sort = TRUE)
+specified_words_sorted_by_chapter <- count(specified_words_filtered_merged, chapter, word, sort = TRUE)
 
-specified_words_sorted_by_section <- specified_words_filtered_merged |>
-  select(section, word) |>
-  count(section, word, sort = TRUE)
+specified_words_sorted_by_section <- count(specified_words_filtered_merged, section, word, sort = TRUE)
 
-specified_words_sorted_by_block <- specified_words_filtered_merged |>
-  select(block, word) |>
-  count(block, word, sort = TRUE)
+specified_words_sorted_by_block <- count(specified_words_filtered_merged, block, word, sort = TRUE)
 
 # calculating and plotting aggregate frequency of all 20 words by chapter/section (not particularly interesting):
 
@@ -282,19 +274,19 @@ aggregate_word_frequency_by_chapter <- specified_words_sorted_by_chapter |>
   group_by(chapter) |>
   summarise(n = sum(n)) |>
   left_join(total_words_by_chapter, by = "chapter") |>
-  mutate (percentage = n/total)
+  mutate(percentage = n/total)
 
 aggregate_word_frequency_by_section <- specified_words_sorted_by_section |>
   group_by(section) |>
   summarise(n = sum(n)) |>
   left_join(total_words_by_section, by = "section") |>
-  mutate (percentage = n/total)
+  mutate(percentage = n/total)
 
 aggregate_word_frequency_by_block <- specified_words_sorted_by_block |>
   group_by(block) |>
   summarise(n = sum(n)) |>
   left_join(total_words_by_block, by = "block") |>
-  mutate (percentage = n/total)
+  mutate(percentage = n/total)
 
 library(patchwork)
 theme_set(theme_classic())
@@ -308,17 +300,32 @@ plot1 <- ggplot(aggregate_word_frequency_by_chapter, aes(chapter, percentage)) +
 plot2 <- ggplot(aggregate_word_frequency_by_section, aes(section, percentage)) +
   geom_line(color = "#ED1C24") +
   scale_x_continuous(limits = c(1,39), breaks = seq(0, 100, by = 5), expand = c(0, 0)) +
-  theme(axis.title.y = element_text(vjust = 2, family = "mono"),
+  theme(axis.title.y = element_blank(),
         axis.title.x = element_text(family = "mono"))
 
 plot3 <- ggplot(aggregate_word_frequency_by_block, aes(block, percentage)) +
   geom_line(color = "#ED1C24") +
-  scale_x_continuous(limits = c(1,1194), breaks = seq(0, 1194, by = 100), expand = c(0, 0)) +
-  theme(axis.title.y = element_text(vjust = 2, family = "mono"),
+  scale_x_continuous(limits = c(1,1194), breaks = seq(0, 1194, by = 200), expand = c(0, 0)) +
+  theme(axis.title.y = element_blank(),
         axis.title.x = element_text(family = "mono"))
 
-plot2
+plot1 + plot2 + plot3 + plot_annotation(title = "frequency of all specified words in C", subtitle = "by chapter, section, and block of 100 words") & theme(plot.title = element_text(family = "mono", face = "bold"), plot.subtitle = element_text(family = "mono"))
 ```
+
+I quickly calculate Pearson correlation coefficients for the above data to check for any linear trend:
+
+```{r, echo = FALSE, comment = NA}
+cor1 <- cor.test(~ chapter + percentage, aggregate_word_frequency_by_chapter)
+
+cor2 <- cor.test(~ section + percentage, aggregate_word_frequency_by_section)
+
+cor3 <- cor.test(~ block + percentage, aggregate_word_frequency_by_block)
+
+cat(" chapter\n", "correlation:", cor1$estimate, "\n", "p-value:", cor1$p.value, "\n\n",
+    "section\n", "correlation:", cor2$estimate, "\n", "p-value:", cor2$p.value, "\n\n",
+    "block\n", "correlation:", cor3$estimate, "\n", "p-value:", cor3$p.value)
+```
+If calculated based on 100-word blocks, there's an increase in frequency of specified words at a modest level of significance.
 
 Now I look at the frequency of specific words across chapters/sections/blocks:
 
@@ -426,7 +433,7 @@ plot3 <- ggplot(specified_word_frequency_by_block, aes(block)) +
         legend.title = element_text(family = "mono"),
         legend.text = element_text(family = "mono"))
 
-plot1
+plot2
 ```
 
 ### Correlation analysis of specified words:
