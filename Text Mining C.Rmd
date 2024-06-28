@@ -1,6 +1,6 @@
 ---
 title: "Text Mining _C_ (v1)"
-output: html_document
+output: github_document
 ---
 
 This markdown document contains the outputs I refer to in my Substack post on text mining Tom McCarthy's brilliant novel _C_, as well as the code I use to get those outputs. Text file of _C_ not included, _bien sûr_.
@@ -210,12 +210,12 @@ ggraph(c_bigrams_graph, layout = "fr") +
 Here I look at the frequency in _C_ of the following words, based on appearances per chapter or section:
 
 ```{r, echo = FALSE, comment = NA}
-table <- matrix(c("C", "call", "carbon", "centre", "Christ",
+table1 <- matrix(c("C", "call", "carbon", "centre", "Christ",
                   "cipher", "cocaine", "code", "communication/Comintern", "connect",
                   "copper", "crypt/cryptography/etc.", "cyan/cyanide", "cyst", "sea"),
                 5, 3)
 
-prmatrix(table, rowlab = rep("", 5), collab = rep("", 3))
+prmatrix(table1, rowlab = rep("", 5), collab = rep("", 3))
 ```
 
 First I look at the aggregate frequency of all 20 words across chapters, sections, and blocks of 100 words.
@@ -262,11 +262,14 @@ total_words_by_block <- c_tidy_blocked |>
 
 # getting number of specified words by chapter/section/block
 
-specified_words_sorted_by_chapter <- count(specified_words_filtered_merged, chapter, word, sort = TRUE)
+specified_words_sorted_by_chapter <- count(specified_words_filtered_merged, chapter, word, sort = TRUE) |>
+  arrange(word)
 
-specified_words_sorted_by_section <- count(specified_words_filtered_merged, section, word, sort = TRUE)
+specified_words_sorted_by_section <- count(specified_words_filtered_merged, section, word, sort = TRUE) |>
+  arrange(word)
 
-specified_words_sorted_by_block <- count(specified_words_filtered_merged, block, word, sort = TRUE)
+specified_words_sorted_by_block <- count(specified_words_filtered_merged, block, word, sort = TRUE) |>
+  arrange(word)
 
 # calculating and plotting aggregate frequency of all 20 words by chapter/section (not particularly interesting):
 
@@ -309,12 +312,12 @@ plot3 <- ggplot(aggregate_word_frequency_by_block, aes(block, percentage)) +
   theme(axis.title.y = element_blank(),
         axis.title.x = element_text(family = "mono"))
 
-plot1 + plot2 + plot3 + plot_annotation(title = "frequency of all specified words in C", subtitle = "by chapter, section, and block of 100 words") & theme(plot.title = element_text(family = "mono", face = "bold"), plot.subtitle = element_text(family = "mono"))
+plot1 + plot2 + plot3 + plot_annotation(title = "aggregate frequency of all Special Words in C", subtitle = "by chapter, section, and block of 100 words") & theme(plot.title = element_text(family = "mono", face = "bold"), plot.subtitle = element_text(family = "mono"))
 ```
 
-I quickly calculate Pearson correlation coefficients for the above data to check for any linear trend:
+I calculate Pearson correlation coefficients for the above data to check for any linear trend:
 
-```{r, echo = FALSE, comment = NA}
+```{r echo = FALSE, comment = NA}
 cor1 <- cor.test(~ chapter + percentage, aggregate_word_frequency_by_chapter)
 
 cor2 <- cor.test(~ section + percentage, aggregate_word_frequency_by_section)
@@ -325,11 +328,11 @@ cat(" chapter\n", "correlation:", cor1$estimate, "\n", "p-value:", cor1$p.value,
     "section\n", "correlation:", cor2$estimate, "\n", "p-value:", cor2$p.value, "\n\n",
     "block\n", "correlation:", cor3$estimate, "\n", "p-value:", cor3$p.value)
 ```
-If calculated based on 100-word blocks, there's an increase in frequency of specified words at a modest level of significance.
+There's a positive correlation between frequency of specified words and the progression of the novel. If calculated based on 100-word blocks, the increase has a modest level of significance.
 
 Now I look at the frequency of specific words across chapters/sections/blocks:
 
-```{r}
+```{r out.width = "100%", fig.align = "center", dpi = 300}
 # calculating frequency of specified words across chapters/sections/blocks:
 
 specified_word_frequency_by_chapter <- specified_words_sorted_by_chapter |>
@@ -347,7 +350,7 @@ specified_word_frequency_by_block <- specified_words_sorted_by_block |>
   left_join(total_words_by_block, by = "block") |>
   mutate(across(c(2:16), ~ .x/total))
 
-# plotting individual frequencies of all 20 words across chapters/sections
+# plotting individual frequencies of all 20 words across chapters/sections/blocks:
 
 plot1 <- ggplot(specified_word_frequency_by_chapter, aes(chapter)) +
   geom_line(aes(y = c, colour = "c")) +
@@ -369,7 +372,7 @@ plot1 <- ggplot(specified_word_frequency_by_chapter, aes(chapter)) +
   scale_y_continuous(expand = c(0, 0)) +
   scale_color_manual(values = c("#ED1C24","#EF7B10","#0060A8", "#B26300", "#FFD329", "#007D32", "#F4A9BE", "#A1A5A7", "#9B0058", "#0019A8", "#00FFA1", "#9364CC", "cyan", "#6CBE45", "#BD3844")) +
   labs(x = "chapter", y = "frequency", color="word") +
-  ggtitle("frequency of select words from C by chapter") +
+  ggtitle("frequency of Special Words from C by chapter") +
   theme(axis.title.x = element_text(family = "mono"),
         axis.title.y = element_text(family = "mono"),
         plot.title = element_text(family = "mono"),
@@ -397,7 +400,7 @@ plot2 <- ggplot(specified_word_frequency_by_section, aes(section)) +
   scale_y_continuous(expand = c(0, 0)) +
   scale_color_manual(values = c("#ED1C24","#EF7B10","#0060A8", "#B26300", "#FFD329", "#007D32", "#F4A9BE", "#A1A5A7", "#9B0058", "#0019A8", "#00FFA1", "#9364CC", "cyan", "#6CBE45", "#BD3844")) +
   labs(x = "section", y = "frequency", color="word") +
-  ggtitle("frequency of select words from C by section") +
+  ggtitle("frequency of Special Words from C by section") +
   theme(axis.title.x = element_text(family = "mono"),
         axis.title.y = element_text(family = "mono"),
         plot.title = element_text(family = "mono"),
@@ -425,7 +428,7 @@ plot3 <- ggplot(specified_word_frequency_by_block, aes(block)) +
   scale_y_continuous(expand = c(0, 0)) +
   scale_color_manual(values = c("#ED1C24","#EF7B10","#0060A8", "#B26300", "#FFD329", "#007D32", "#F4A9BE", "#A1A5A7", "#9B0058", "#0019A8", "#00FFA1", "#9364CC", "cyan", "#6CBE45", "#BD3844")) +
   labs(x = "block", y = "frequency", color="word") +
-  ggtitle("frequency of select words from C by block of 100 words") +
+  ggtitle("frequency of Special Words from C by block of 100 words") +
   theme(axis.title.x = element_text(family = "mono"),
         axis.title.y = element_text(family = "mono"),
         plot.title = element_text(family = "mono"),
@@ -433,10 +436,131 @@ plot3 <- ggplot(specified_word_frequency_by_block, aes(block)) +
         legend.title = element_text(family = "mono"),
         legend.text = element_text(family = "mono"))
 
-plot2
+plot1
 ```
 
-### Correlation analysis of specified words:
+Here too, I calculate Pearson correlation coefficients for the above data to check for linear trends:
+
+```{r echo = FALSE, comment = NA}
+# run Pearson correlation tests between all specified words and chapters/sections/blocks:
+
+cor_tests_by_chapter <- specified_word_frequency_by_chapter |>
+  select(c(2:16)) |>
+  apply(2, cor.test, specified_word_frequency_by_chapter$chapter)
+
+cor_tests_by_section <- specified_word_frequency_by_section |>
+  select(c(2:16)) |>
+  apply(2, cor.test, specified_word_frequency_by_section$section)
+
+cor_tests_by_block <- specified_word_frequency_by_block |>
+  select(c(2:16)) |>
+  apply(2, cor.test, specified_word_frequency_by_block$block)
+
+# there has to be a better way of getting all the correlation values and p-values to print in a table:
+
+table2 <- matrix(c(cor_tests_by_chapter$c$estimate,
+                   cor_tests_by_chapter$c$p.value,
+                   cor_tests_by_section$c$estimate,
+                   cor_tests_by_section$c$p.value,
+                   cor_tests_by_block$c$estimate,
+                   cor_tests_by_block$c$p.value,
+                   cor_tests_by_chapter$call$estimate,
+                   cor_tests_by_chapter$call$p.value,
+                   cor_tests_by_section$call$estimate,
+                   cor_tests_by_section$call$p.value,
+                   cor_tests_by_block$call$estimate,
+                   cor_tests_by_block$call$p.value,
+                   cor_tests_by_chapter$carbon$estimate,
+                   cor_tests_by_chapter$carbon$p.value,
+                   cor_tests_by_section$carbon$estimate,
+                   cor_tests_by_section$carbon$p.value,
+                   cor_tests_by_block$carbon$estimate,
+                   cor_tests_by_block$carbon$p.value,
+                   cor_tests_by_chapter$centre$estimate,
+                   cor_tests_by_chapter$centre$p.value,
+                   cor_tests_by_section$centre$estimate,
+                   cor_tests_by_section$centre$p.value,
+                   cor_tests_by_block$centre$estimate,
+                   cor_tests_by_block$centre$p.value,
+                   cor_tests_by_chapter$christ$estimate,
+                   cor_tests_by_chapter$christ$p.value,
+                   cor_tests_by_section$christ$estimate,
+                   cor_tests_by_section$christ$p.value,
+                   cor_tests_by_block$christ$estimate,
+                   cor_tests_by_block$christ$p.value,
+                   cor_tests_by_chapter$cipher$estimate,
+                   cor_tests_by_chapter$cipher$p.value,
+                   cor_tests_by_section$cipher$estimate,
+                   cor_tests_by_section$cipher$p.value,
+                   cor_tests_by_block$cipher$estimate,
+                   cor_tests_by_block$cipher$p.value,
+                   cor_tests_by_chapter$cocaine$estimate,
+                   cor_tests_by_chapter$cocaine$p.value,
+                   cor_tests_by_section$cocaine$estimate,
+                   cor_tests_by_section$cocaine$p.value,
+                   cor_tests_by_block$cocaine$estimate,
+                   cor_tests_by_block$cocaine$p.value,
+                   cor_tests_by_chapter$code$estimate,
+                   cor_tests_by_chapter$code$p.value,
+                   cor_tests_by_section$code$estimate,
+                   cor_tests_by_section$code$p.value,
+                   cor_tests_by_block$code$estimate,
+                   cor_tests_by_block$code$p.value,
+                   cor_tests_by_chapter$communication$estimate,
+                   cor_tests_by_chapter$communication$p.value,
+                   cor_tests_by_section$communication$estimate,
+                   cor_tests_by_section$communication$p.value,
+                   cor_tests_by_block$communication$estimate,
+                   cor_tests_by_block$communication$p.value,
+                   cor_tests_by_chapter$connect$estimate,
+                   cor_tests_by_chapter$connect$p.value,
+                   cor_tests_by_section$connect$estimate,
+                   cor_tests_by_section$connect$p.value,
+                   cor_tests_by_block$connect$estimate,
+                   cor_tests_by_block$connect$p.value,
+                   cor_tests_by_chapter$copper$estimate,
+                   cor_tests_by_chapter$copper$p.value,
+                   cor_tests_by_section$copper$estimate,
+                   cor_tests_by_section$copper$p.value,
+                   cor_tests_by_block$copper$estimate,
+                   cor_tests_by_block$copper$p.value,
+                   cor_tests_by_chapter$crypt$estimate,
+                   cor_tests_by_chapter$crypt$p.value,
+                   cor_tests_by_section$crypt$estimate,
+                   cor_tests_by_section$crypt$p.value,
+                   cor_tests_by_block$crypt$estimate,
+                   cor_tests_by_block$crypt$p.value,
+                   cor_tests_by_chapter$cyan$estimate,
+                   cor_tests_by_chapter$cyan$p.value,
+                   cor_tests_by_section$cyan$estimate,
+                   cor_tests_by_section$cyan$p.value,
+                   cor_tests_by_block$cyan$estimate,
+                   cor_tests_by_block$cyan$p.value,
+                   cor_tests_by_chapter$cyst$estimate,
+                   cor_tests_by_chapter$cyst$p.value,
+                   cor_tests_by_section$cyst$estimate,
+                   cor_tests_by_section$cyst$p.value,
+                   cor_tests_by_block$cyst$estimate,
+                   cor_tests_by_block$cyst$p.value,
+                   cor_tests_by_chapter$sea$estimate,
+                   cor_tests_by_chapter$sea$p.value,
+                   cor_tests_by_section$sea$estimate,
+                   cor_tests_by_section$sea$p.value,
+                   cor_tests_by_block$sea$estimate,
+                   cor_tests_by_block$sea$p.value),
+                15, 6, byrow = TRUE)
+
+prmatrix(table2,
+         rowlab = c("C", "call", "carbon", "centre", "Christ",
+                  "cipher", "cocaine", "code", "communication/Comintern", "connect",
+                  "copper", "crypt/cryptography/etc.", "cyan/cyanide", "cyst", "sea"),
+         collab = c("chapter (cor)", "(p-value)",
+                    "section (cor)", "(p-value)",
+                    "block (cor)", "(p-value)"))
+
+```
+
+### Pairwise correlation analysis of specified words:
 
 Finally, I look at which of the 15 words beginning with _C_ specified above are most likely to occur in the same chapter/section of _C_:
 
@@ -460,13 +584,27 @@ word_pairs_by_block <- specified_words_filtered_merged |>
 
 top_word_pairs_by_section <- word_pairs_by_section |>
   filter(correlation > .3)
-
-top_word_pairs_by_section
 ```
 
-And here's a visualization of every pair of those specified words that has a greater than 0.2 correlation within sections of _C_:
+Here are the 10 specified words most correlated with "c" by chapter:
 
 ```{r}
+word_pairs_by_chapter |>
+  filter(item1 == "c") |>
+  slice_max(correlation, n = 10, with_ties = FALSE)
+```
+
+Here are the 10 specified words most correlated with "call" by chapter:
+
+```{r}
+word_pairs_by_chapter |>
+  filter(item1 == "call") |>
+  slice_max(correlation, n = 10, with_ties = FALSE)
+```
+
+And here's a visualization of every pair of those specified words that has a greater than 0 correlation within chapters/blocks of _C_:
+
+```{r out.width = "100%", fig.align = "center", dpi = 300}
 set.seed(44)
 
 plot1 <- word_pairs_by_chapter |>
@@ -493,5 +631,5 @@ plot3 <- word_pairs_by_block |>
   geom_node_text(aes(label = name), repel = TRUE) +
   theme_void()
 
-plot3
+plot1 + plot3
 ```
