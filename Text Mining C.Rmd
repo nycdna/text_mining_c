@@ -1,6 +1,8 @@
 ---
 title: "Text Mining _C_ (v1)"
-output: github_document
+output:
+  html_document:
+    keep_md: true
 ---
 
 This markdown document contains the outputs I refer to in my Substack post on text mining Tom McCarthy's brilliant novel _C_, as well as the code I use to get those outputs. Text file of _C_ not included, _bien sûr_.
