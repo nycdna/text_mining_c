@@ -312,7 +312,7 @@ special_words_filtered_merged <- special_words_filtered |>
   mutate(word = gsub(regex("^cyan[a-zà-ÿ]+\\b"), "cyan", word)) |>
   mutate(word = gsub(regex("^cyst[a-zà-ÿ]+\\b"), "cyst", word))
 
-# get total number of words by chapter/section/block (inclusive of stopwords)
+# get total number of words in each chapter/section/block (inclusive of stopwords)
 
 total_words_by_chapter <- c_df |>
   unnest_tokens(word, text) |>
@@ -406,13 +406,14 @@ I calculate Pearson correlation coefficients for the above data to check for any
  correlation: 0.1137324 
  p-value: 0.04683194
 ```
-There's a positive correlation between frequency of special words and the progression of the novel. If calculated based on 100-word blocks, the increase has a modest level of statistical significance.
 
-Now I look at the frequency of specific words across chapters/sections/blocks:
+There's a positive correlation between frequency of special words and the forward temporal progression of the novel. If calculated based on 100-word blocks, the increase has a modest level of statistical significance.
+
+Now I look at the frequency of individual Special Words across chapters/sections/blocks:
 
 
 ``` r
-# calculating frequency of special words across chapters/sections/blocks:
+# calculate frequency of individual Special Words across chapters/sections/blocks:
 
 special_word_frequency_by_chapter <- special_words_sorted_by_chapter |>
   pivot_wider(names_from = word, values_from = n, values_fill = 0) |>
@@ -429,7 +430,7 @@ special_word_frequency_by_block <- special_words_sorted_by_block |>
   left_join(total_words_by_block, by = "block") |>
   mutate(across(c(2:16), ~ .x/total))
 
-# plotting individual frequencies of all 20 words across chapters/sections/blocks:
+# plot individual frequencies of all 15 Special Words words across chapters/sections/blocks:
 
 plot2.1 <- ggplot(special_word_frequency_by_chapter, aes(chapter)) +
   geom_line(aes(y = c, colour = "c")) +
@@ -545,7 +546,7 @@ sea                      0.114460260 4.543315e-02
 
 ### Pairwise correlation analysis of special words:
 
-Finally, I look at which of the 15 words beginning with _C_ special above are most likely to occur in the same chapter/section of _C_.
+Finally, I look at the phi coefficients for pairs of Special Words within the same chapter/section/block of _C_ (that is, how correlated the appearance of one Special Word within a given chapter/section/block is with the appearance of another Special Word within that same chapter/section/block).
 
 
 ``` r
@@ -561,7 +562,7 @@ word_pairs_by_section <- pairwise_cor(special_word_pairs, word, section, sort = 
 word_pairs_by_block <- pairwise_cor(special_word_pairs, word, block, sort = TRUE)
 ```
 
-Here are the 10 special words most correlated with "c" by chapter:
+Here are the 10 Special Words most correlated with "c" by chapter:
 
 
 ``` r
@@ -586,7 +587,7 @@ word_pairs_by_chapter |>
 ## 10 c     sea                 0.293
 ```
 
-Here are the 10 special words most correlated with "call" by chapter:
+Here are the 10 Special Words most correlated with "call" by chapter:
 
 
 ``` r
@@ -611,12 +612,12 @@ word_pairs_by_chapter |>
 ## 10 call  cyan                0.135
 ```
 
-And here's a visualization of every pair of Special Words that has a greater than 0 correlation within chapters (left) and blocks (right) of _C_:
+And here's a visualization of every pair of Special Words that has a positive correlation within chapters (left) and 100-word blocks (right) of _C_:
 
 <img src="Text-Mining-C_files/figure-html/unnamed-chunk-16-1.png" width="100%" style="display: block; margin: auto;" />
 
 ### Coda
 
-Here I just generate a few more visualizations I use in my Substack post:
+Here I just generate a couple of added visualizations I use in my Substack post:
 
-<img src="Text-Mining-C_files/figure-html/unnamed-chunk-17-1.png" width="100%" style="display: block; margin: auto;" /><img src="Text-Mining-C_files/figure-html/unnamed-chunk-17-2.png" width="100%" style="display: block; margin: auto;" />
+<img src="Text-Mining-C_files/figure-html/unnamed-chunk-17-1.png" width="100%" style="display: block; margin: auto;" /><img src="Text-Mining-C_files/figure-html/unnamed-chunk-17-2.png" width="100%" style="display: block; margin: auto;" /><img src="Text-Mining-C_files/figure-html/unnamed-chunk-17-3.png" width="100%" style="display: block; margin: auto;" /><img src="Text-Mining-C_files/figure-html/unnamed-chunk-17-4.png" width="100%" style="display: block; margin: auto;" />

@@ -583,7 +583,7 @@ Here are the 10 Special Words most correlated with "c" by chapter:
 
 ```{r}
 word_pairs_by_chapter |>
-  filter(item2 == "c") |>
+  filter(item1 == "c") |>
   slice_max(correlation, n = 10, with_ties = FALSE)
 ```
 
@@ -591,7 +591,7 @@ Here are the 10 Special Words most correlated with "call" by chapter:
 
 ```{r}
 word_pairs_by_chapter |>
-  filter(item2 == "call") |>
+  filter(item1 == "call") |>
   slice_max(correlation, n = 10, with_ties = FALSE)
 ```
 
@@ -639,6 +639,58 @@ Here I just generate a couple of added visualizations I use in my Substack post:
 ```{r echo = FALSE, out.width = "100%", fig.align = "center", dpi = 300}
 
 plot1.3 + plot_annotation(title = "aggregate frequency of all Special Words in C", subtitle = "by block of 100 words") & theme(plot.title = element_text(family = "mono", face = "bold"), plot.subtitle = element_text(family = "mono"))
+
+plot4.1 <- ggplot(special_word_frequency_by_chapter, aes(chapter)) +
+  geom_line(aes(y = c, colour = "c")) +
+  geom_line(aes(y = call, colour = "call")) +
+  geom_line(aes(y = carbon, colour = "carbon")) +
+  #geom_line(aes(y = centre, colour = "centre")) +
+  geom_line(aes(y = christ, colour = "christ")) +
+  #geom_line(aes(y = cipher, colour = "cipher")) +
+  geom_line(aes(y = cocaine, colour = "cocaine")) +
+  #geom_line(aes(y = code, colour = "code")) +
+  geom_line(aes(y = communication, colour = "communication")) +
+  #geom_line(aes(y = connect, colour = "connect")) +
+  #geom_line(aes(y = copper, colour = "copper")) +
+  #geom_line(aes(y = crypt, colour = "crypt")) +
+  #geom_line(aes(y = cyan, colour = "cyan")) +
+  geom_line(aes(y = cyst, colour = "cyst")) +
+  geom_line(aes(y = sea, colour = "sea")) +
+  scale_x_continuous(limits = c(1, 12), breaks = seq(0, 100), expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_colour_manual(values = c("#ED1C24","#EF7B10","#0060A8", #"#B26300",
+                                 "#FFD329", #"#007D32", 
+                                 "#F4A9BE", #"#A1A5A7", 
+                                 "#9B0058", #"#0019A8", "#00FFA1", "#9364CC", "cyan",
+                                 "#6CBE45", "#BD3844")) +
+  labs(x = "chapter", y = "frequency", colour = "word") +
+  theme(text = element_text(family = "mono"))
+
+plot4.1
+
+plot4.2 <- ggplot(special_word_frequency_by_chapter, aes(chapter)) +
+  #geom_line(aes(y = c, colour = "c")) +
+  #geom_line(aes(y = call, colour = "call")) +
+  #geom_line(aes(y = carbon, colour = "carbon")) +
+  #geom_line(aes(y = centre, colour = "centre")) +
+  #geom_line(aes(y = christ, colour = "christ")) +
+  geom_line(aes(y = cipher, colour = "cipher")) +
+  #geom_line(aes(y = cocaine, colour = "cocaine")) +
+  geom_line(aes(y = code, colour = "code")) +
+  #geom_line(aes(y = communication, colour = "communication")) +
+  #geom_line(aes(y = connect, colour = "connect")) +
+  #geom_line(aes(y = copper, colour = "copper")) +
+  geom_line(aes(y = crypt, colour = "crypt")) +
+  #geom_line(aes(y = cyan, colour = "cyan")) +
+  #geom_line(aes(y = cyst, colour = "cyst")) +
+  #geom_line(aes(y = sea, colour = "sea")) +
+  scale_x_continuous(limits = c(1, 12), breaks = seq(0, 100), expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_colour_manual(values = c("#007D32", "#A1A5A7", "#9364CC")) +
+  labs(x = "chapter", y = "frequency", colour = "word") +
+  theme(text = element_text(family = "mono"))
+
+plot4.2
 
 plot3.1 + ggtitle("")
 ```
