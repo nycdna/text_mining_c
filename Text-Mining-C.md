@@ -9,7 +9,7 @@ This markdown document contains the outputs I refer to in my [Substack post](htt
 
 A significant amount of the code below is adapted from Julia Silge and David Robinson’s [_Text Mining with R: A Tidy Approach_](https://www.tidytextmining.com/). Additionally, I imagine there are better or more elegant ways of doing many of the things I do below. My general approach was to just cobble together whatever I needed to make this project work.
 
-### Preprocessing:
+### Preprocessing
 
 ``` r
 library(tidyverse)
@@ -64,7 +64,9 @@ c_tidy <- c_tidy_blocked |>
   mutate(word = wordStem(word, language = "english"))
 ```
 
-### Basic term frequency analysis:
+### Overall unigram frequency analysis
+
+#### Basic frequency:
 
 Here are the ten most frequently appearing word stems in _C_:
 
@@ -84,6 +86,8 @@ Here are the ten most frequently appearing word stems in _C_:
 ##  9 eye     150
 ## 10 word    142
 ```
+
+#### tf-idf:
 
 And here are the top ten word stems in _C_ by tf–idf, after assembling a corpus of public domain novels in which to calculate tf–idf:
 
@@ -147,7 +151,9 @@ c_top_tf_idf
 ## 10 dobai    0.00194
 ```
 
-### Bigram frequency analysis:
+### Overall bigram frequency analysis
+
+#### Basic frequency analysis:
 
 Here I tokenize _C_ into bigrams instead of unigrams:
 
@@ -198,6 +204,12 @@ And here are the 20 most frequent bigrams in _C_:
 ## 19 mosaic garden       9
 ## 20 black ink           8
 ```
+
+Here's a graph of those top 20 bigrams:
+
+<img src="Text-Mining-C_files/figure-html/unnamed-chunk-6-1.png" width="85%" style="display: block; margin: auto;" />
+
+#### tf-idf:
 
 Now I check to see if the top 20 bigrams in _C_ remain basically the same if we calculate them based on tf-idf instead of simple frequency:
 
@@ -267,13 +279,9 @@ c_top_bigram_tf_idf
 ## 20    school pupil 0.001029627
 ```
 
-They're close to being the same, with the notable omission of "c c," which disappears due to strings like "reverend Nicholas Dudley C. C." in _Ulysses_ and "'It would be an incalculable loss if,' &c., &c." in _Heart of Darkness_.
+They're close to being the same, with the notable omission of "c c," which disappears due to strings like "reverend Nicholas Dudley C. C." in [_Ulysses_](https://www.gutenberg.org/cache/epub/4300/pg4300-images.html) and "'It would be an incalculable loss if,' &c., &c." in [_Heart of Darkness_](https://www.gutenberg.org/files/219/219-h/219-h.htm).
 
-Closing out the bigrams analysis, here's a graph of the 20 most frequent bigrams in _C_:
-
-<img src="Text-Mining-C_files/figure-html/unnamed-chunk-7-1.png" width="85%" style="display: block; margin: auto;" />
-
-### Frequency analysis of select words starting with "C":
+### Frequency analysis of select words starting with C
 
 Here I look at the frequency in _C_ of the following words (which I'll call "Special Words"), based on appearances per chapter, section, or block of 100 words:
 
@@ -286,6 +294,8 @@ Here I look at the frequency in _C_ of the following words (which I'll call "Spe
  "centre" "communication/Comintern" "cyst"                   
  "Christ" "connect"                 "sea"                    
 ```
+
+#### Aggregate frequency:
 
 First I look at the aggregate frequency of all Special Words across chapters, sections, and blocks of 100 words.
 
@@ -408,6 +418,8 @@ I calculate Pearson correlation coefficients for the above data to check for any
 ```
 
 There's a positive correlation between frequency of special words and the forward temporal progression of the novel. If calculated based on 100-word blocks, the increase has a modest level of statistical significance.
+
+#### Individual frequency:
 
 Now I look at the frequency of individual Special Words across chapters/sections/blocks:
 
@@ -544,7 +556,7 @@ cyst                    -0.009865364 8.635387e-01
 sea                      0.114460260 4.543315e-02
 ```
 
-### Pairwise correlation analysis of special words:
+### Pairwise correlation analysis of special words
 
 Finally, I look at the phi coefficients for pairs of Special Words within the same chapter/section/block of _C_ (that is, how correlated the appearance of one Special Word within a given chapter/section/block is with the appearance of another Special Word within that same chapter/section/block).
 
