@@ -207,7 +207,7 @@ And here are the 20 most frequent bigrams in _C_:
 
 Here's a graph of those top 20 bigrams:
 
-<img src="Text-Mining-C_files/figure-html/unnamed-chunk-6-1.png" width="85%" style="display: block; margin: auto;" />
+<img src="Text-Mining-C_files/figure-html/bigram_graph-1.png" width="85%" style="display: block; margin: auto;" />
 
 #### tf-idf:
 
@@ -398,7 +398,7 @@ plot1.3 <- ggplot(aggregate_word_frequency_by_block, aes(block, percentage)) +
 plot1.1 + plot1.2 + plot1.3 + plot_annotation(title = "aggregate frequency of all Special Words in C", subtitle = "by chapter, section, and block of 100 words") & theme(plot.title = element_text(family = "mono", face = "bold"), plot.subtitle = element_text(family = "mono"))
 ```
 
-<img src="Text-Mining-C_files/figure-html/unnamed-chunk-9-1.png" width="100%" style="display: block; margin: auto;" />
+<img src="Text-Mining-C_files/figure-html/special_words_aggregrate_frequency-1.png" width="100%" style="display: block; margin: auto;" />
 
 I calculate Pearson correlation coefficients for the above data to check for any linear trend:
 
@@ -516,7 +516,7 @@ plot2.3 <- ggplot(special_word_frequency_by_block, aes(block)) +
 plot2.1
 ```
 
-<img src="Text-Mining-C_files/figure-html/unnamed-chunk-11-1.png" width="100%" style="display: block; margin: auto;" />
+<img src="Text-Mining-C_files/figure-html/special_words_individual_frequency-1.png" width="100%" style="display: block; margin: auto;" />
 
 Here too, I calculate Pearson correlation coefficients for the above data to check for linear trends:
 
@@ -626,10 +626,10 @@ word_pairs_by_chapter |>
 
 And here's a visualization of every pair of Special Words that has a positive correlation within chapters (left) and 100-word blocks (right) of _C_:
 
-<img src="Text-Mining-C_files/figure-html/unnamed-chunk-16-1.png" width="100%" style="display: block; margin: auto;" />
+<img src="Text-Mining-C_files/figure-html/top_pairwise_graphs-1.png" width="100%" style="display: block; margin: auto;" />
 
 ### Coda
 
 Here I just generate a couple of added visualizations I use in my Substack post:
 
-<img src="Text-Mining-C_files/figure-html/unnamed-chunk-17-1.png" width="100%" style="display: block; margin: auto;" /><img src="Text-Mining-C_files/figure-html/unnamed-chunk-17-2.png" width="100%" style="display: block; margin: auto;" /><img src="Text-Mining-C_files/figure-html/unnamed-chunk-17-3.png" width="100%" style="display: block; margin: auto;" /><img src="Text-Mining-C_files/figure-html/unnamed-chunk-17-4.png" width="100%" style="display: block; margin: auto;" />
+<img src="Text-Mining-C_files/figure-html/extra-1.png" width="100%" style="display: block; margin: auto;" /><img src="Text-Mining-C_files/figure-html/extra-2.png" width="100%" style="display: block; margin: auto;" /><img src="Text-Mining-C_files/figure-html/extra-3.png" width="100%" style="display: block; margin: auto;" /><img src="Text-Mining-C_files/figure-html/extra-4.png" width="100%" style="display: block; margin: auto;" />
