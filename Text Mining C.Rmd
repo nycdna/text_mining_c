@@ -666,7 +666,7 @@ plot4.1 <- ggplot(special_word_frequency_by_chapter, aes(chapter)) +
   #geom_line(aes(y = copper, colour = "copper")) +
   #geom_line(aes(y = crypt, colour = "crypt")) +
   #geom_line(aes(y = cyan, colour = "cyan")) +
-  geom_line(aes(y = cyst, colour = "cyst")) +
+  #geom_line(aes(y = cyst, colour = "cyst")) +
   geom_line(aes(y = sea, colour = "sea")) +
   scale_x_continuous(limits = c(1, 12), breaks = seq(0, 100), expand = c(0, 0)) +
   scale_y_continuous(expand = c(0, 0)) +
@@ -674,7 +674,8 @@ plot4.1 <- ggplot(special_word_frequency_by_chapter, aes(chapter)) +
                                  "#FFD329", #"#007D32", 
                                  "#F4A9BE", #"#A1A5A7", 
                                  "#9B0058", #"#0019A8", "#00FFA1", "#9364CC", "cyan",
-                                 "#6CBE45", "#BD3844")) +
+                                 #"#6CBE45",
+                                 "#BD3844")) +
   labs(x = "chapter", y = "frequency", colour = "word") +
   theme(text = element_text(family = "mono"))
 
